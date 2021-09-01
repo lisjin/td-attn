@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import math
-import numpy as np
 
 from encoder import TokenEncoder, RelationEncoder2, BagEncoder
 from decoder import DecodeLayer
@@ -64,17 +63,13 @@ class Generator(nn.Module):
                 inp['td_sgs'], inp['td_bdepths'], inp['rel2bag'], inp['bmasks'])
         return concept_repr, concept_mask, relation
 
-    def encoder_attn(self, inp, lst):
-        concept_repr, concept_mask, relation = self.con_rel_enc(inp)
-        attn = self.graph_encoder.get_attn_weights(concept_repr, relation,
-                inp['td_masks'], self_padding_mask=concept_mask)
-        attn_m = attn[:, 1:, 1:].argmax(2)
-        cmask = concept_mask[1:].cpu().numpy()
-        for b in range(attn_m.shape[2]):
-            bl = np.where(cmask[:, b] == 1)[0]
-            bl = bl[0] - 1 if bl.size else cmask[:, b].shape[0]
-            lst.append(attn_m[:, :bl, b])
-        # nlayers x tgt_len x src_len x bsz x num_heads
+    def encoder_attn(self, inp):
+        with torch.no_grad():
+            concept_repr, concept_mask, relation = self.con_rel_enc(inp)
+            attn = self.graph_encoder.get_attn_weights(concept_repr, relation,
+                    inp['td_masks'], self_padding_mask=concept_mask)
+            # nlayers x tgt_len x src_len x bsz x num_heads
+        return attn
 
     def encode_step(self, inp):
         concept_repr, concept_mask, relation = self.con_rel_enc(inp)
@@ -85,11 +80,6 @@ class Generator(nn.Module):
         concept_repr = concept_repr[1:]
         concept_mask = concept_mask[1:]
         return concept_repr, concept_mask, probe
-
-    def extract_attn(self, data, lst):
-        with torch.no_grad():
-            self.encoder_attn(data, lst)
-        return lst  # bsz elements of shape [nlayers, tgt_len, num_heads]
 
     def work(self, data, beam_size, max_time_step, min_time_step=1):
         with torch.no_grad():

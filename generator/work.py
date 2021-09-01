@@ -112,14 +112,10 @@ if __name__ == "__main__":
         model.eval()
 
         tot = 0
-        lst = []
         with open(test_model+args.output_suffix, 'w') as fo:
             for batch in test_data:
-                batch = move_to_cuda(batch, model.device)
-                model.extract_attn(batch, lst)
-                #res = generate_batch(model, batch, args.beam_size, args.alpha, args.max_time_step)
-                #for token, score, abstract in zip(res['token'], res['score'], batch['abstract']):
-                #    fo.write('#model output:'+' '.join(token)+'\n')
-                #    tot += 1
-        import pdb; pdb.set_trace()
+                res = generate_batch(model, batch, args.beam_size, args.alpha, args.max_time_step)
+                for token, score, abstract in zip(res['token'], res['score'], batch['abstract']):
+                    fo.write('#model output:'+' '.join(token)+'\n')
+                    tot += 1
         print ('write down %d sentences'%tot)
